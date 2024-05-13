@@ -10,7 +10,6 @@ const hostIP = workerData.hostIP;
 const hostname = workerData.hostname;
 const HTTPport = workerData.HTTPport; 
 const HTTPchildPort = workerData.HTTPchildPort;
-let sharedBuffer = workerData.sharedBuffer
 
 //Machine d'état Demandeur / Dehors / Dedans
 let status = "dehors";
@@ -45,10 +44,6 @@ async function tokenReceived(token){
   switch(status){
     case 'demandeur':
       console.log(`${id} :token received while 'demandeur' : begins crossing`);
-
-      //besoin de stopper le producteur ici 
-      const intArray = new Int8Array(sharedBuffer);
-      console.log(intArray[0])
 
       status = 'dedans';
       await cross(token);

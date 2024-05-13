@@ -4,16 +4,15 @@ const hostname = "127.0.0.1";
 
 
 class myWorker{
-  constructor({id,hostname,HTTPport,HTTPchildPort, sharedBuffer}){
+  constructor({id,hostname,HTTPport,HTTPchildPort}){
     this.id = id;
     this.hostname = hostname;
     this.HTTPport = HTTPport;
     this.HTTPchildPort = HTTPchildPort;
     this.worker = undefined;
-    this.sharedBuffer = sharedBuffer
   }
   async init(){
-    this.worker =  new Worker( `${__dirname}/worker-site.js`, {workerData: {id:this.id,  hostname:this.hostname, HTTPport:this.HTTPport, HTTPchildPort:this.HTTPchildPort, sharedBuffer:this.sharedBuffer}} );
+    this.worker =  new Worker( `${__dirname}/worker-site.js`, {workerData: {id:this.id,  hostname:this.hostname, HTTPport:this.HTTPport, HTTPchildPort:this.HTTPchildPort}} );
     
     return new Promise((resolve,reject)=>{
       this.worker.on('message', 
@@ -32,7 +31,7 @@ class RingOfWorkers extends Array {
       this.numberOfWorkers = numberOfWorkers;
       this.hostname = hostname;
       this.startPort = startPort;
-      this.shareBuffer = new SharedArrayBuffer(2);
+
 
       let HTTPport = this.startPort;
       let HTTPchildPort = this.startPort;
@@ -43,7 +42,7 @@ class RingOfWorkers extends Array {
         }else{
           HTTPchildPort = HTTPport+1;
         }
-        const theWorker = new myWorker({id,hostname:this.hostname,HTTPport,HTTPchildPort, sharedBuffer:this.shareBuffer})
+        const theWorker = new myWorker({id,hostname:this.hostname,HTTPport,HTTPchildPort})
         this.push(theWorker);
 
       }
@@ -91,7 +90,7 @@ class RingOfWorkers extends Array {
 }
 
 
-const myRingOfWorkers = new RingOfWorkers({numberOfWorkers:1,hostname, startPort:3000});
+const myRingOfWorkers = new RingOfWorkers({numberOfWorkers:2,hostname, startPort:3000});
 myRingOfWorkers.init().then(()=>{console.log(`done`)})
 
 

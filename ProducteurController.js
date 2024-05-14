@@ -25,7 +25,8 @@ class ProducteurController {
    * @param {string} worker_src Lien vers le worker de production
    */
   constructor(id = threadId, port, worker_src) {
-    this.id = id;
+    this.app = express();
+    this.id = port;
     this.status = STATUS_IDLE;
     this.port = port;
     this.id_consommateur = null;
@@ -74,24 +75,22 @@ class ProducteurController {
   start() {
     if (this.status !== STATUS_IDLE) return;
     this.status = STATUS_STARTING;
+    this.app.use(express.json());
+    this.app.use(express.urlencoded({ extended: true }));
     return new Promise((resolve, reject) => {
-      const app = express();
-      app.use(express.json());
-      app.use(express.urlencoded({ extended: true }));
-
       /**
        * Gère les messages échangés avec les autres contrôlleurs
        */
-      app.post("/msg", (req, res) => {
-        if (!req.body.type) return;
+      this.app.post("/msg", (req, res) => {
         console.log(
-          `${i} new request from ${req.body.i} (he: ${req.body.he} hl: ${this.hl})`
+          `${this.id} new request from ${req.body.i} (he: ${req.body.he} hl: ${this.hl})`
         );
+        if (!req.body.type) return;
         switch (req.body.type) {
           // Réception d'un message de type req
           case MSG_REQ:
             this.maj_h(req.body.he);
-            hl++;
+            this.hl++;
             this.sendTo(req.body.i, MSG_ACK);
             this.updateTab(this.port, MSG_REQ, req.body.he);
             break;
@@ -121,7 +120,7 @@ class ProducteurController {
         res.status(200);
       });
 
-      app.listen(this.port, async () => {
+      this.app.listen(this.port, () => {
         this.status = STATUS_RUNNING;
         parentPort.postMessage(MSG_INIT);
         this.startWorker();
@@ -208,19 +207,21 @@ class ProducteurController {
 
   /**
    * Diffuse un message à tout les controller connus
-   * @param {string} msg Type du message à diffuser
+   * @param {string} type Type du message à diffuser
    */
-  diffuser(msg) {
+  diffuser(type) {
+    console.log(`${this.id} broadcast ${type}`);
     this.links
       .filter((p) => p !== this.port)
       .forEach((port) => {
-        fetch(`http://127.0.0.1:${port}`, {
+        fetch(`http://127.0.0.1:${port}/msg`, {
           method: "POST",
-          body: {
+          headers: new Headers({ "content-type": "application/json" }),
+          body: JSON.stringify({
             he: this.hl,
             i: this.port,
-            type: msg,
-          },
+            type: type,
+          }),
         });
       });
   }
@@ -232,14 +233,16 @@ class ProducteurController {
    * @param {any} [payload=undefined] Contenu additionnel
    */
   sendTo(port, type, payload = undefined) {
-    fetch(`http://127.0.0.1:${port}`, {
+    console.log(`${this.id} send ${type} to ${port}`);
+    fetch(`http://127.0.0.1:${port}/msg`, {
       method: "POST",
-      body: {
+      headers: new Headers({ "content-type": "application/json" }),
+      body: JSON.stringify({
         he: this.hl,
         i: this.port,
         type: type,
         payload: payload,
-      },
+      }),
     });
   }
 

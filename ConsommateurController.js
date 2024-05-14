@@ -6,45 +6,27 @@ const {
   MSG_LINK,
   MSG_BESOIN_SC,
   MSG_FIN_SC,
+  MSG_MAJ,
+  MSG_DEB_SC,
 } = require("./Constants.js");
 const express = require("express");
 const { parentPort, threadId, workerData, Worker } = require("worker_threads");
 
-const CHECK_SC_MANAGER = {
-  set: (target, _, val) => {
-    target = val;
-    this.checkSc();
-  },
-};
-
 class ConsommateurController {
-  constructor(id, port, worker) {
-    this.id = id;
+  constructor(id, port, worker_url) {
+    this.id = port;
     this.status = STATUS_IDLE;
     this.port = port;
     this.producteurs = [];
-    this.worker = new Worker(worker);
+    this.worker = null;
+    this.worker_url = worker_url;
 
     this.debcons = 0;
     this.fincons = 0;
     this.ifinprod = 0;
 
-    this.req_en_cours = new Proxy(
-      {
-        selected: false,
-      },
-      {
-        CHECK_SC_MANAGER,
-      }
-    );
-    this.sc_en_cours = new Proxy(
-      {
-        selected: false,
-      },
-      {
-        CHECK_SC_MANAGER,
-      }
-    );
+    this.req_en_cours = false;
+    this.sc_en_cours = false;
   }
 
   checkSc() {
@@ -53,9 +35,10 @@ class ConsommateurController {
       this.req_en_cours &&
       this.debcons - this.ifinprod < 0
     ) {
+      console.log("accès à la sc autorisé");
       this.debcons = this.debcons + 1;
       this.worker.postMessage(MSG_DEB_SC);
-      this.sc_en_cours = vrai;
+      this.sc_en_cours = true;
     }
   }
 
@@ -72,11 +55,15 @@ class ConsommateurController {
       });
 
       app.post("/msg", (req, res) => {
-        console.log(`${this.id} received ${req.body}`);
+        console.log(`${this.id} received}`, req.body);
         switch (req.body.type) {
           case MSG_MAJ:
+            console.log(
+              `${this.id} met à jour ifinprod (=${req.body.payload.ifinprod})`
+            );
             //MIse a jour
-            this.ifinprod = req.body.ifinprod;
+            this.ifinprod = req.body.payload.ifinprod;
+            this.checkSc();
             break;
           default:
             break;
@@ -87,8 +74,30 @@ class ConsommateurController {
       app.listen(this.port, () => {
         this.status = STATUS_RUNNING;
         parentPort.postMessage(MSG_INIT);
+        this.startWorker();
         resolve();
       });
+    });
+  }
+
+  startWorker() {
+    this.worker = new Worker(this.worker_url);
+
+    this.worker.on("message", (e) => {
+      switch (e) {
+        // ACQUISITION
+        case MSG_BESOIN_SC:
+          console.log("Consommateur demande de SC");
+          this.besoin_sc();
+          break;
+        //LIBERATION
+        case MSG_FIN_SC:
+          console.log("Consommateur fin de SC");
+          this.fin_sc();
+          break;
+        default:
+          break;
+      }
     });
   }
 
@@ -98,10 +107,11 @@ class ConsommateurController {
       .forEach((port) => {
         fetch(`http://127.0.0.1:${port}/msg`, {
           method: "POST",
-          body: {
+          headers: new Headers({ "content-type": "application/json" }),
+          body: JSON.stringify({
             ifincons: this.fincons,
             type: msg,
-          },
+          }),
         });
       });
   }
@@ -113,20 +123,24 @@ class ConsommateurController {
   }
 
   besoin_sc() {
+    if (this.req_en_cours) return;
+    console.log(`${this.id} demande de la sc`);
     //Verifier "id" du producteur qui envoi la demande ?
     this.req_en_cours = true;
+    this.checkSc();
   }
 
   fin_sc() {
+    console.log(`${this.id} fin de la sc`);
     if (!this.req_en_cours || !this.sc_en_cours) return;
     this.fincons = this.fincons + 1;
-    let k = 1;
 
     //on doit envoyer a tous les producteur la MAJ de fincons
     this.diffuser(MSG_MAJ);
 
     this.sc_en_cours = false;
     this.req_en_cours = false;
+    this.checkSc();
   }
 }
 
@@ -140,23 +154,6 @@ parentPort.on("message", (e) => {
   switch (e.type) {
     case MSG_LINK:
       controller.addProducteur(e.payload);
-      break;
-    default:
-      break;
-  }
-});
-
-controller.worker.on("message", (e) => {
-  switch (e) {
-    // ACQUISITION
-    case MSG_BESOIN_SC:
-      console.log("Consommateur demande de SC");
-      controller.besoin_sc();
-      break;
-    //LIBERATION
-    case MSG_FIN_SC:
-      console.log("Consommateur fin de SC");
-      controller.fin_sc();
       break;
     default:
       break;

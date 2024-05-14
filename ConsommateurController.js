@@ -4,23 +4,59 @@ const {
   STATUS_RUNNING,
   MSG_INIT,
   MSG_LINK,
+  MSG_BESOIN_SC,
+  MSG_FIN_SC,
 } = require("./Constants.js");
 const express = require("express");
-const { parentPort, threadId, workerData } = require("worker_threads");
+const { parentPort, threadId, workerData, Worker } = require("worker_threads");
+
+const CHECK_SC_MANAGER = {
+  set: (target, _, val) => {
+    target = val;
+    this.checkSc();
+  },
+};
 
 class ConsommateurController {
-  constructor(id, port) {
+  constructor(id, port, worker) {
     this.id = id;
     this.status = STATUS_IDLE;
     this.port = port;
-    this.links = [];
+    this.producteurs = [];
+    this.worker = new Worker(worker);
 
     this.debcons = 0;
     this.fincons = 0;
     this.ifinprod = 0;
 
-    this.req_en_cours = false;
-    this.sc_en_cours = false;
+    this.req_en_cours = new Proxy(
+      {
+        selected: false,
+      },
+      {
+        CHECK_SC_MANAGER,
+      }
+    );
+    this.sc_en_cours = new Proxy(
+      {
+        selected: false,
+      },
+      {
+        CHECK_SC_MANAGER,
+      }
+    );
+  }
+
+  checkSc() {
+    if (
+      !this.sc_en_cours &&
+      this.req_en_cours &&
+      this.debcons - this.ifinprod < 0
+    ) {
+      this.debcons = this.debcons + 1;
+      this.worker.postMessage(MSG_DEB_SC);
+      this.sc_en_cours = vrai;
+    }
   }
 
   start() {
@@ -36,7 +72,15 @@ class ConsommateurController {
       });
 
       app.post("/msg", (req, res) => {
-        console.log("${this.id} received ${req.body}");
+        console.log(`${this.id} received ${req.body}`);
+        switch (req.body.type) {
+          case MSG_MAJ:
+            //MIse a jour
+            this.ifinprod = req.body.ifinprod;
+            break;
+          default:
+            break;
+        }
         res.end();
       });
 
@@ -48,10 +92,24 @@ class ConsommateurController {
     });
   }
 
-  link(id) {
-    if (this.links.includes(id)) return;
-    this.links.push(id);
-    console.log("${this.id} linked to port ${id}");
+  diffuser(msg) {
+    this.producteurs
+      .filter((p) => p !== this.port)
+      .forEach((port) => {
+        fetch(`http://127.0.0.1:${port}/msg`, {
+          method: "POST",
+          body: {
+            ifincons: this.fincons,
+            type: msg,
+          },
+        });
+      });
+  }
+
+  addProducteur(id) {
+    if (this.producteurs.includes(id)) return;
+    this.producteurs.push(id);
+    console.log(`${this.id} add to port ${id}`);
   }
 
   besoin_sc() {
@@ -64,15 +122,45 @@ class ConsommateurController {
     this.fincons = this.fincons + 1;
     let k = 1;
 
+    //on doit envoyer a tous les producteur la MAJ de fincons
+    this.diffuser(MSG_MAJ);
+
     this.sc_en_cours = false;
     this.req_en_cours = false;
   }
 }
 
-const controller = new ConsommateurController(threadId, workerData.port);
+const controller = new ConsommateurController(
+  threadId,
+  workerData.port,
+  "./DummyConsommateur.js"
+);
 
 parentPort.on("message", (e) => {
-  console.log(e.payload);
+  switch (e.type) {
+    case MSG_LINK:
+      controller.addProducteur(e.payload);
+      break;
+    default:
+      break;
+  }
+});
+
+controller.worker.on("message", (e) => {
+  switch (e) {
+    // ACQUISITION
+    case MSG_BESOIN_SC:
+      console.log("Consommateur demande de SC");
+      controller.besoin_sc();
+      break;
+    //LIBERATION
+    case MSG_FIN_SC:
+      console.log("Consommateur fin de SC");
+      controller.fin_sc();
+      break;
+    default:
+      break;
+  }
 });
 
 controller.start().then(() => {

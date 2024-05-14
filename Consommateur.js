@@ -16,14 +16,14 @@ class Consommateur {
   start() {
     return new Promise((resolve, reject) => {
       const action = (e) => {
-        console.log("receive message from ${e}");
+        console.log(`receive message from ${e}`);
         resolve();
       };
       this.worker.on("message", action);
     });
   }
 
-  link(port) {
+  addProd(port) {
     this.worker.postMessage({
       type: MSG_LINK,
       payload: port,

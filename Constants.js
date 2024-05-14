@@ -10,6 +10,10 @@ const MSG_LINK = "LINK";
 const MSG_REQ = "REQ";
 const MSG_REL = "REL";
 const MSG_ACK = "ACK";
+const MSG_BESOIN_SC = "ASK_SC";
+const MSG_FIN_SC = "END_SC";
+const MSG_MAJ = "MAJ";
+const MSG_DEB_SC = "START_SC";
 
 module.exports = {
   STATUS_IDLE,
@@ -22,4 +26,8 @@ module.exports = {
   MSG_REQ,
   MSG_REL,
   MSG_ACK,
+  MSG_BESOIN_SC,
+  MSG_FIN_SC,
+  MSG_MAJ,
+  MSG_DEB_SC,
 };

@@ -1,4 +1,4 @@
-const { parentPort, workerData, threadId } = require("worker_threads");
+const { parentPort, workerData, threadId, Worker } = require("worker_threads");
 const express = require("express");
 const {
   STATUS_IDLE,
@@ -9,18 +9,26 @@ const {
   MSG_REL,
   MSG_REQ,
   MSG_ACK,
+  MSG_BESOIN_SC,
+  MSG_MAJ,
+  MSG_FIN_SC,
+  MSG_DEB_SC,
 } = require("./Constants");
+
+const N = 1;
 
 class ProducteurController {
   /**
    *
    * @param {number} id Identifiant du producteur
    * @param {number} port Port de communication HTTP
+   * @param {string} worker_src Lien vers le worker de production
    */
-  constructor(id = threadId, port) {
+  constructor(id = threadId, port, worker_src) {
     this.id = id;
     this.status = STATUS_IDLE;
     this.port = port;
+    this.id_consommateur = null;
     this.links = [];
 
     this.hl = 0;
@@ -33,7 +41,34 @@ class ProducteurController {
     this.req_en_cours = false;
     this.sc_en_cours = false;
 
-    this.tab.set(this.port, [MSG_REL, 0]);
+    this.updateTab(this.port, MSG_REL, 0);
+
+    this.worker_src = worker_src;
+    this.worker = null;
+  }
+
+  /**
+   * Vérifie si la section critique peut être donné au producteur
+   */
+  checkSc() {
+    if (!this.req_en_cours || this.sc_en_cours) return;
+    if (this.debprod - this.ifincons >= N) return;
+    if (this.plus_vieille_date() !== this.port) return;
+    console.log(`${this.id} accès à la sc autorisé`);
+    this.sc_en_cours = true;
+    this.debprod++;
+    this.worker.postMessage(MSG_DEB_SC);
+  }
+
+  /**
+   * Met à jour le tableau de messages pour le contrôleur spécifié
+   * @param {number} port Port du contrôleur
+   * @param {string} msg Type du message
+   * @param {number} hl Horloge du contrôleur
+   */
+  updateTab(port, msg, hl) {
+    this.tab.set(port, [msg, hl]);
+    this.checkSc();
   }
 
   start() {
@@ -44,17 +79,41 @@ class ProducteurController {
       app.use(express.json());
       app.use(express.urlencoded({ extended: true }));
 
-      app.post("/msg", ({ body }, res) => {
-        switch (body.type) {
+      /**
+       * Gère les messages échangés avec les autres contrôlleurs
+       */
+      app.post("/msg", (req, res) => {
+        if (!req.body.type) return;
+        console.log(
+          `${i} new request from ${req.body.i} (he: ${req.body.he} hl: ${this.hl})`
+        );
+        switch (req.body.type) {
           // Réception d'un message de type req
           case MSG_REQ:
-            console.log(
-              `${i} new request from ${body.i} (he: ${body.he} hl: ${this.hl})`
-            );
-            this.maj_h(body.he);
+            this.maj_h(req.body.he);
             hl++;
-            this.sendTo(body.i, MSG_ACK);
-            this.tab.set(this.port, [MSG_REQ, body.he]);
+            this.sendTo(req.body.i, MSG_ACK);
+            this.updateTab(this.port, MSG_REQ, req.body.he);
+            break;
+          // Réception d'un message de type ack
+          case MSG_ACK:
+            this.maj_h(req.body.he);
+            if (this.tab.get(req.body.i)[0] !== MSG_REQ) {
+              this.updateTab(req.body.i, MSG_ACK, req.body.he);
+            }
+            break;
+          // Réception d'un message de type rel
+          case MSG_REL:
+            this.maj_h(req.body.he);
+            this.updateTab(this.port, MSG_REL, req.body.he);
+            this.debprod++;
+            this.checkSc();
+            this.finprod++;
+            break;
+          // Réception d'un message de type maj
+          case MSG_MAJ:
+            this.ifincons = req.body.ifincons;
+            this.checkSc();
             break;
           default:
             break;
@@ -62,23 +121,89 @@ class ProducteurController {
         res.status(200);
       });
 
-      app.listen(this.port, () => {
+      app.listen(this.port, async () => {
         this.status = STATUS_RUNNING;
         parentPort.postMessage(MSG_INIT);
+        this.startWorker();
         resolve();
       });
     });
   }
 
   /**
+   * Démarre le worker de production
+   */
+  startWorker() {
+    this.worker = new Worker(this.worker_src);
+
+    /**
+     * Gère les messages échangés avec le worker producteur
+     */
+    this.worker.on("message", (e) => {
+      switch (e) {
+        // Acquisition
+        case MSG_BESOIN_SC:
+          console.log(`${this.id} received besoin_sc`);
+          this.acquisition();
+          break;
+        // Liberation
+        case MSG_FIN_SC:
+          console.log(`${this.id} received fin_sc`);
+          this.libere();
+          break;
+        default:
+          break;
+      }
+    });
+  }
+
+  /**
    * Etabli un tunnel de communication entre le port d'un controlleur passé en paramètre et le producteur
    * @param {number} port Port du controlleur
+   * @param {boolean} [is_consommateur=false] Doit valoir true si c'est un consommateur
    */
-  link(port) {
+  link(port, is_consommateur = false) {
+    if (!this.id_consommateur && is_consommateur === true) {
+      this.id_consommateur = port;
+      console.log(`${this.id} linked to consommateur ${port}`);
+      return;
+    }
+    if (is_consommateur) return;
     if (this.links.includes(port)) return;
     this.links.push(port);
-    this.tab.set(port, [MSG_REL, 0]);
+    this.updateTab(port, MSG_REL, 0);
     console.log(`${this.id} linked to port ${port}`);
+  }
+
+  /**
+   * Demande l'accès à la section critique
+   */
+  acquisition() {
+    console.log(`${this.id} demande la sc`);
+    if (this.req_en_cours) return;
+    this.hl++;
+    this.req_en_cours = true;
+    this.checkSc();
+    this.diffuser(MSG_REQ);
+    this.updateTab(this.port, MSG_REQ, this.hl);
+  }
+
+  /**
+   * Libère la section critique à la fin de l'accès par le producteur
+   */
+  libere() {
+    if (!this.req_en_cours || !this.sc_en_cours) return;
+    this.sc_en_cours = false;
+    this.req_en_cours = false;
+    this.finprod++;
+    // Envoi le message MSG_MAJ au consommateur
+    this.sendTo(this.id_consommateur, MSG_MAJ, {
+      ifinprod: this.finprod,
+    });
+    this.hl++;
+    this.diffuser(MSG_REL);
+    this.updateTab(this.port, MSG_REL, this.hl);
+    console.log(`${this.id} libere la sc`);
   }
 
   /**
@@ -86,30 +211,34 @@ class ProducteurController {
    * @param {string} msg Type du message à diffuser
    */
   diffuser(msg) {
-    this.links.forEach((port) => {
-      fetch(`http://127.0.0.1:${port}`, {
-        method: "POST",
-        body: {
-          he: this.hl,
-          i: this.port,
-          type: msg,
-        },
+    this.links
+      .filter((p) => p !== this.port)
+      .forEach((port) => {
+        fetch(`http://127.0.0.1:${port}`, {
+          method: "POST",
+          body: {
+            he: this.hl,
+            i: this.port,
+            type: msg,
+          },
+        });
       });
-    });
   }
 
   /**
    * Envoi un message à un controller spécifique
    * @param {number} port Port de destination
-   * @param {string} msg Type du message à envoyer
+   * @param {string} type Type du message à envoyer
+   * @param {any} [payload=undefined] Contenu additionnel
    */
-  sendTo(port, msg) {
+  sendTo(port, type, payload = undefined) {
     fetch(`http://127.0.0.1:${port}`, {
       method: "POST",
       body: {
         he: this.hl,
         i: this.port,
-        type: msg,
+        type: type,
+        payload: payload,
       },
     });
   }
@@ -141,12 +270,19 @@ class ProducteurController {
   }
 }
 
-const controller = new ProducteurController(workerData.id, workerData.port);
+const controller = new ProducteurController(
+  workerData.id,
+  workerData.port,
+  "./DummyProducteur.js"
+);
 
+/**
+ * Gère les messages échangés avec le thread principal
+ */
 parentPort.on("message", (e) => {
   switch (e.type) {
     case MSG_LINK:
-      controller.link(e.payload);
+      controller.link(e.payload.port, e.payload.consommateur);
       break;
     default:
       break;

@@ -8,13 +8,10 @@ consA.start().then(() => {
 });
 
 const prodA = new Producteur(1, 3434);
-const prodB = new Producteur(2, 3435);
 
+prodA.link(consA);
 prodA.start().then(() => {
   console.log("ProdA est demarre");
-  prodA.link(3435);
 });
-prodB.start().then(() => {
-  console.log("ProdB est demarre");
-  prodB.link(3434);
-});
+
+consA.addProd(3434);

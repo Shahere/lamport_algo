@@ -1,5 +1,6 @@
 const { Worker } = require("worker_threads");
 const { MSG_LINK } = require("./Constants");
+const Consommateur = require("./Consommateur");
 
 class Producteur {
   /**
@@ -33,12 +34,15 @@ class Producteur {
 
   /**
    * Etabli un tunnel de communication entre le port d'un controlleur passé en paramètre et le producteur
-   * @param {number} port Port du controlleur
+   * @param {Producteur | Consommateur} controller Controller d'un producteur ou consommateur
    */
-  link(port) {
+  link(controller) {
     this.worker.postMessage({
       type: MSG_LINK,
-      payload: port,
+      payload: {
+        port: controller.port,
+        consommateur: controller instanceof Consommateur,
+      },
     });
   }
 }

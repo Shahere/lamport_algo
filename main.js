@@ -12,28 +12,22 @@ const prodB = new Producteur(2, 3433);
 const prodC = new Producteur(3, 3432);
 const prodD = new Producteur(4, 3431);
 
-prodA.link(consA);
-prodA.link(prodC);
-
-prodB.link(prodC);
-prodB.link(prodD);
-
-prodC.link(prodA);
-prodC.link(prodB);
-
-prodD.link(prodB);
+prodA.link(consA, prodB, prodC, prodD);
+prodB.link(consA, prodA, prodC, prodD);
+prodC.link(consA, prodA, prodB, prodD);
+prodD.link(consA, prodA, prodB, prodC);
 
 prodA.start().then(() => {
   console.log("ProdA est demarre");
 });
 prodB.start().then(() => {
-  console.log("ProdA est demarre");
+  console.log("ProdB est demarre");
 });
 prodC.start().then(() => {
-  console.log("ProdA est demarre");
+  console.log("ProdC est demarre");
 });
 prodD.start().then(() => {
-  console.log("ProdA est demarre");
+  console.log("ProdD est demarre");
 });
 
 consA.addProd(3434);

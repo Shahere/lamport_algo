@@ -34,15 +34,17 @@ class Producteur {
 
   /**
    * Etabli un tunnel de communication entre le port d'un controlleur passé en paramètre et le producteur
-   * @param {Producteur | Consommateur} controller Controller d'un producteur ou consommateur
+   * @param {Producteur[] | Consommateur[]} controller Controller d'un producteur ou consommateur
    */
-  link(controller) {
-    this.worker.postMessage({
-      type: MSG_LINK,
-      payload: {
-        port: controller.port,
-        consommateur: controller instanceof Consommateur,
-      },
+  link(...controllers) {
+    controllers.forEach((controller) => {
+      this.worker.postMessage({
+        type: MSG_LINK,
+        payload: {
+          port: controller.port,
+          consommateur: controller instanceof Consommateur,
+        },
+      });
     });
   }
 }

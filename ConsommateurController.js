@@ -13,6 +13,13 @@ const express = require("express");
 const { parentPort, threadId, workerData, Worker } = require("worker_threads");
 
 class ConsommateurController {
+
+  /**
+   * 
+   * @param {*} id 
+   * @param {*} port 
+   * @param {*} worker_url 
+   */
   constructor(id, port, worker_url) {
     this.id = port;
     this.status = STATUS_IDLE;
@@ -29,6 +36,11 @@ class ConsommateurController {
     this.sc_en_cours = false;
   }
 
+  /**
+   * 
+   * Check conditions for critical section
+   * 
+   */
   checkSc() {
     if (
       !this.sc_en_cours &&
@@ -42,6 +54,10 @@ class ConsommateurController {
     }
   }
 
+  /**
+   * start controller
+   * @returns Promise, execution
+   */
   start() {
     if (this.status !== STATUS_IDLE) return;
     this.status = STATUS_STARTING;
@@ -80,6 +96,11 @@ class ConsommateurController {
     });
   }
 
+  /**
+   * 
+   * Start dummy Consommateur worker
+   * 
+   */
   startWorker() {
     this.worker = new Worker(this.worker_url);
 
@@ -101,6 +122,10 @@ class ConsommateurController {
     });
   }
 
+  /**
+   * Broascast a message for all known port (for all other entities)
+   * @param {*} msg 
+   */
   diffuser(msg) {
     this.producteurs
       .filter((p) => p !== this.port)
@@ -116,12 +141,21 @@ class ConsommateurController {
       });
   }
 
+  /**
+   * Add a producteur to known list (use for broadcast)
+   * @param {*} id 
+   * @returns return nothing. Pass if the ID is already in producteur list
+   */
   addProducteur(id) {
     if (this.producteurs.includes(id)) return;
     this.producteurs.push(id);
     console.log(`${this.id} add to port ${id}`);
   }
 
+  /**
+   * Trigger when Dummyworker need SC, event : MSG_BESOIN_SC
+   * @returns 
+   */
   besoin_sc() {
     if (this.req_en_cours) return;
     console.log(`${this.id} demande de la sc`);
@@ -130,6 +164,10 @@ class ConsommateurController {
     this.checkSc();
   }
 
+  /**
+   * Trigger when Dummyworker when with SC
+   * @returns 
+   */
   fin_sc() {
     console.log(`${this.id} fin de la sc`);
     if (!this.req_en_cours || !this.sc_en_cours) return;
@@ -150,6 +188,9 @@ const controller = new ConsommateurController(
   "./DummyConsommateur.js"
 );
 
+/**
+ * Grab messages with main thread
+ */
 parentPort.on("message", (e) => {
   switch (e.type) {
     case MSG_LINK:

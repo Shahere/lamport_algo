@@ -2,6 +2,11 @@ const { Worker } = require("worker_threads");
 const { MSG_LINK } = require("./Constants");
 
 class Consommateur {
+  /**
+   * 
+   * @param {*} id 
+   * @param {*} port 
+   */
   constructor(id, port) {
     this.id = id;
     this.port = port;
@@ -13,6 +18,10 @@ class Consommateur {
     });
   }
 
+  /**
+   * Start a consumer
+   * @returns Promise good achievement
+   */
   start() {
     return new Promise((resolve, reject) => {
       const action = (e) => {
@@ -23,6 +32,10 @@ class Consommateur {
     });
   }
 
+  /**
+   * Add a producteur to consumer known list
+   * @param {*} port 
+   */
   addProd(port) {
     this.worker.postMessage({
       type: MSG_LINK,

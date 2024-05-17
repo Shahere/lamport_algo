@@ -7,6 +7,10 @@ console.log = (...args) => {
   old("[DummyConsommateur] " + args);
 };
 
+/**
+ * Dummy consumer ask for critical section
+ * @returns Promise 
+ */
 function ask() {
   console.log("Demande la section critique");
   return new Promise((resolve, reject) => {

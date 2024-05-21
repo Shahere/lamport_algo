@@ -19,10 +19,10 @@ const N = 1;
 
 class ProducteurController {
   /**
-   *
+   * Instancie un controlleur du producteur
    * @param {number} id Identifiant du producteur
    * @param {number} port Port de communication HTTP
-   * @param {string} worker_src Lien vers le worker de production
+   * @param {string} worker_src Chemin vers le fichier du worker de production
    */
   constructor(id = threadId, port, worker_src) {
     this.app = express();
@@ -72,6 +72,10 @@ class ProducteurController {
     this.checkSc();
   }
 
+  /**
+   * Démarre le worker de production ainsi que le serveur HTTP du conrolleur
+   * @returns {Promise<void>} Résolu quand le serveur est démarré
+   */
   start() {
     if (this.status !== STATUS_IDLE) return;
     this.status = STATUS_STARTING;
@@ -256,7 +260,7 @@ class ProducteurController {
 
   /**
    * Retourne le port du processus ayant la plus vieille date
-   * @returns {number} Port du processus
+   * @returns {number} Port du processus ayant la plus vieille date
    */
   plus_vieille_date() {
     let port_min = this.port;

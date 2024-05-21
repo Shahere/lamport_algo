@@ -4,9 +4,9 @@ const Consommateur = require("./Consommateur");
 
 class Producteur {
   /**
-   *
-   * @param {number} id
-   * @param {number} port
+   * Instancie in producteur
+   * @param {number} id Identifiant du producteur
+   * @param {number} port Port de communication du producteur
    */
   constructor(id, port) {
     this.id = id;
@@ -21,6 +21,7 @@ class Producteur {
 
   /**
    * Démarre un producteur
+   * @returns {Promise<void>} Résolu quand le worker est démarré
    */
   start() {
     return new Promise((resolve, reject) => {

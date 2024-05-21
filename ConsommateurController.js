@@ -13,12 +13,11 @@ const express = require("express");
 const { parentPort, threadId, workerData, Worker } = require("worker_threads");
 
 class ConsommateurController {
-
   /**
-   * 
-   * @param {*} id 
-   * @param {*} port 
-   * @param {*} worker_url 
+   * Instancie un nouveau controlleur de consommateur
+   * @param {number} id Identifiant du consommateur
+   * @param {number} port Port de communication
+   * @param {string} worker_url Chemin d'accès vers le fichier du worker consommateur
    */
   constructor(id, port, worker_url) {
     this.id = port;
@@ -37,9 +36,7 @@ class ConsommateurController {
   }
 
   /**
-   * 
-   * Check conditions for critical section
-   * 
+   * Vérifie si l'accès à la section critique est possible et l'accorde
    */
   checkSc() {
     if (
@@ -55,8 +52,8 @@ class ConsommateurController {
   }
 
   /**
-   * start controller
-   * @returns Promise, execution
+   * Démarre le worker de consommation ainsi que le serveur HTTP du controlleur
+   * @returns {Promise<void>}
    */
   start() {
     if (this.status !== STATUS_IDLE) return;
@@ -97,9 +94,7 @@ class ConsommateurController {
   }
 
   /**
-   * 
-   * Start dummy Consommateur worker
-   * 
+   * Démarre le worker de consommation
    */
   startWorker() {
     this.worker = new Worker(this.worker_url);
@@ -123,8 +118,8 @@ class ConsommateurController {
   }
 
   /**
-   * Broascast a message for all known port (for all other entities)
-   * @param {*} msg 
+   * Diffuse un message à tous les controlleurs
+   * @param {string} msg Type du message
    */
   diffuser(msg) {
     this.producteurs
@@ -143,8 +138,7 @@ class ConsommateurController {
 
   /**
    * Add a producteur to known list (use for broadcast)
-   * @param {*} id 
-   * @returns return nothing. Pass if the ID is already in producteur list
+   * @param {number} id
    */
   addProducteur(id) {
     if (this.producteurs.includes(id)) return;
@@ -154,7 +148,6 @@ class ConsommateurController {
 
   /**
    * Trigger when Dummyworker need SC, event : MSG_BESOIN_SC
-   * @returns 
    */
   besoin_sc() {
     if (this.req_en_cours) return;
@@ -166,7 +159,6 @@ class ConsommateurController {
 
   /**
    * Trigger when Dummyworker when with SC
-   * @returns 
    */
   fin_sc() {
     console.log(`${this.id} fin de la sc`);

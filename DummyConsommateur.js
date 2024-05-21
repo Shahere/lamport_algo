@@ -9,7 +9,7 @@ console.log = (...args) => {
 
 /**
  * Dummy consumer ask for critical section
- * @returns Promise 
+ * @returns {Promise<void>} 
  */
 function ask() {
   console.log("Demande la section critique");
@@ -22,11 +22,17 @@ function ask() {
   });
 }
 
+/**
+ * Free the critical section
+ */
 function free() {
   console.log("Libère la section critique");
   parentPort.postMessage(MSG_FIN_SC);
 }
 
+/**
+ * Run the Dummy worker
+ */
 async function run() {
   await ask();
   console.log("doing some stuff...");

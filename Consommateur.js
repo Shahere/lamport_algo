@@ -4,23 +4,26 @@ const { MSG_LINK } = require("./Constants");
 class Consommateur {
   /**
    * 
-   * @param {*} id 
-   * @param {*} port 
+   * @param {number} id ID du consommateur
+   * @param {number} port PORT du consommateur
+   * @param {SharedArrayBuffer} [ressource=null] Ressource partagé
    */
-  constructor(id, port) {
+  constructor(id, port, ressource=null) {
     this.id = id;
     this.port = port;
+    this.sharedArrayBuffer = ressource;
     this.worker = new Worker("./ConsommateurController.js", {
       workerData: {
         id: this.id,
         port: this.port,
+        ressource: this.sharedArrayBuffer
       },
     });
   }
 
   /**
    * Start a consumer
-   * @returns Promise good achievement
+   * @returns {Promise<void>}
    */
   start() {
     return new Promise((resolve, reject) => {
@@ -34,7 +37,7 @@ class Consommateur {
 
   /**
    * Add a producteur to consumer known list
-   * @param {*} port 
+   * @param {number} port 
    */
   addProd(port) {
     this.worker.postMessage({

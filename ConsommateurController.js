@@ -18,9 +18,11 @@ class ConsommateurController {
    * @param {number} id Identifiant du consommateur
    * @param {number} port Port de communication
    * @param {string} worker_url Chemin d'accès vers le fichier du worker consommateur
+   * @param {SharedArrayBuffer} ressource Ressource partagé
    */
-  constructor(id, port, worker_url) {
+  constructor(id, port, worker_url, ressource) {
     this.id = port;
+    this.ressource = ressource;
     this.status = STATUS_IDLE;
     this.port = port;
     this.producteurs = [];
@@ -97,7 +99,7 @@ class ConsommateurController {
    * Démarre le worker de consommation
    */
   startWorker() {
-    this.worker = new Worker(this.worker_url);
+    this.worker = new Worker(this.worker_url, {workerData: {ressource: this.ressource}});
 
     this.worker.on("message", (e) => {
       switch (e) {
@@ -173,11 +175,12 @@ class ConsommateurController {
     this.checkSc();
   }
 }
-
+console.log(JSON.stringify(workerData))
 const controller = new ConsommateurController(
-  threadId,
-  workerData.port,
-  "./DummyConsommateur.js"
+  id=1,
+  port=workerData.port,
+  worker_url="./DummyConsommateur.js",
+  ressource=workerData.ressource,
 );
 
 /**

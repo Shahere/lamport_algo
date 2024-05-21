@@ -1,7 +1,8 @@
 const Producteur = require("./Producteur");
 const Consommateur = require("./Consommateur");
 
-const consA = new Consommateur(5, 3436);
+const ressource = new SharedArrayBuffer(2)
+const consA = new Consommateur(5, 3436, ressource);
 
 consA.start().then(() => {
   console.log("ConsA est demarre");

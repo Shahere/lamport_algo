@@ -1,7 +1,8 @@
-const { parentPort } = require("worker_threads");
+const { parentPort, workerData } = require("worker_threads");
 const { MSG_BESOIN_SC, MSG_DEB_SC, MSG_FIN_SC } = require("./Constants");
 
 const old = console.log;
+const ressource = workerData.ressource;
 
 console.log = (...args) => {
   old("[DummyConsommateur] " + args);
@@ -36,6 +37,7 @@ function free() {
 async function run() {
   await ask();
   console.log("doing some stuff...");
+  console.log(`Ressource at 0 ${ressource[0]} at 1 ${ressource[1]}`)
   setTimeout(() => {
     free();
     setTimeout(() => {

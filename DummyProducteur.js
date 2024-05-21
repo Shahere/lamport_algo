@@ -9,7 +9,7 @@ console.log = (...args) => {
 
 /**
  * Dummy producteur ask for critical section
- * @returns Promise
+ * @returns {Promise<void>}
  */
 function ask() {
   console.log("Demande la section critique");
